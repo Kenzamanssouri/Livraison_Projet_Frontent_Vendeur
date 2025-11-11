@@ -1,4 +1,4 @@
-import React, { useState, useLayoutEffect } from 'react';
+import React, { useState, useLayoutEffect } from "react";
 import {
   View,
   Text,
@@ -8,289 +8,386 @@ import {
   Modal,
   FlatList,
   TouchableWithoutFeedback,
-  Alert,
   ActivityIndicator,
   StyleSheet,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { useNavigation } from '@react-navigation/native';
+  ImageBackground,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
+import { useRouter } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
+import AwesomeAlert from "react-native-awesome-alerts";
+import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
 
-// Dropdown roles
 const roles = [
-  { label: 'Client', value: 'CLIENT' },
-  { label: 'Vendeur', value: 'VENDEUR' },
-  { label: 'Livreur', value: 'LIVREUR' },
+  { label: "Client", value: "CLIENT" },
+  { label: "Vendeur", value: "VENDEUR" },
+  { label: "Livreur", value: "LIVREUR" },
 ];
 
 export default function SignupScreen() {
   const router = useRouter();
   const navigation = useNavigation();
 
-  // Supprimer le header
   useLayoutEffect(() => {
     navigation.setOptions({ headerShown: false });
   }, [navigation]);
 
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [currentDropdown, setCurrentDropdown] = useState('');
-  
-  // Rôle
-  const [role, setRole] = useState('');
+  const [currentDropdown, setCurrentDropdown] = useState("");
+  const [role, setRole] = useState("");
 
   // Champs communs
-  const [nom, setNom] = useState('');
-  const [prenom, setPrenom] = useState('');
-  const [email, setEmail] = useState('');
-  const [login, setLogin] = useState('');
-  const [motDePasse, setMotDePasse] = useState('');
-  const [telephone, setTelephone] = useState('');
-  const [adresse, setAdresse] = useState('');
-  const [ville, setVille] = useState('');
+  const [nom, setNom] = useState("");
+  const [prenom, setPrenom] = useState("");
+  const [email, setEmail] = useState("");
+  const [login, setLogin] = useState("");
+  const [motDePasse, setMotDePasse] = useState("");
+  const [telephone, setTelephone] = useState("");
+  const [adresse, setAdresse] = useState("");
 
-  // Champs Vendeur
-  const [nomEtablissement, setNomEtablissement] = useState('');
-  const [categorie, setCategorie] = useState('');
-  const [registreCommerce, setRegistreCommerce] = useState('');
-  const [identifiantFiscal, setIdentifiantFiscal] = useState('');
-  const [rib, setRib] = useState('');
-  const [horaireOuverture, setHoraireOuverture] = useState({
-    jour: '',
-    heureOuverture: '',
-    heureFermeture: '',
-  });
-
-  // Champs Livreur
-  const [depotGarantie, setDepotGarantie] = useState('');
+  // Champs livreur
+  const [depotGarantie, setDepotGarantie] = useState("");
   const [disponible, setDisponible] = useState(false);
+  const [matriculeVehicule, setMatriculeVehicule] = useState("");
+  const [estValideParAdmin, setestValideParAdmin] = useState(false);
+  const [photoProfil, setPhotoProfil] = useState(null);
+  const [pieceIdentite, setPieceIdentite] = useState(null);
+  const [assuranceVehicule, setAssuranceVehicule] = useState(null);
+  const [preuveDepotGarantie, setPreuveDepotGarantie] = useState(null);
+  const [livreurId, setLivreurId] = useState(null);
 
-  // Dropdown options
-  const villes = ['Casablanca', 'Rabat', 'Kenitra', 'Marrakech', 'Fes', 'Tanger', 'Agadir', 'Meknes', 'Oujda'];
-  const jours = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
-  const heures = Array.from({ length: 18 }, (_, i) => `${(6 + i).toString().padStart(2, '0')}:00`);
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
 
-  const handleDropdownSelect = (value) => {
-    if (currentDropdown === 'ville') setVille(value);
-    else if (currentDropdown === 'jour') setHoraireOuverture({ ...horaireOuverture, jour: value });
-    else if (currentDropdown === 'heureOuverture') setHoraireOuverture({ ...horaireOuverture, heureOuverture: value });
-    else if (currentDropdown === 'heureFermeture') setHoraireOuverture({ ...horaireOuverture, heureFermeture: value });
-    setModalVisible(false);
+  // --- Gestion des fichiers ---
+  const handlePieceJointe = async (setter, typePj) => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({ type: "*/*" });
+      if (!res.canceled && res.assets?.length > 0) {
+        const file = res.assets[0];
+        setter(file);
+        if (livreurId) await uploadFile(file, livreurId, typePj);
+      }
+    } catch (err) {
+      console.log("Erreur sélection fichier:", err);
+    }
   };
 
+  const handlePhotoProfil = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 1,
+    });
+    if (!result.canceled) {
+      const file = result.assets[0];
+      setPhotoProfil(file);
+      if (livreurId) await uploadFile(file, livreurId, "LivreurFichier-photo");
+    }
+  };
+
+  const uploadFile = async (file, idLivreur, typePj) => {
+    const formData = new FormData();
+    formData.append("file", file.file);
+    formData.append("Id", idLivreur.toString());
+    formData.append("typePjPlanAction", typePj);
+
+    try {
+      const response = await fetch("http://localhost:8082/api/uploadPj1/upload", {
+        method: "POST",
+        body: formData,
+      });
+      if (!response.ok) throw new Error("Erreur upload fichier");
+      return await response.json();
+    } catch (err) {
+      console.error("❌ Upload error:", err);
+      return null;
+    }
+  };
+
+  // --- Envoi du formulaire ---
   const handleSubmit = async () => {
     if (!nom || !email || !motDePasse || !role) {
-      Alert.alert('Champs obligatoires', 'Veuillez remplir tous les champs requis.');
+      setAlertTitle("Champs obligatoires");
+      setAlertMessage("Veuillez remplir tous les champs requis.");
+      setShowAlert(true);
       return;
     }
 
-    let userData = {
-      nom,
-      prenom,
-      email,
-      login,
-      motDePasse,
-      telephone,
-      adresse,
-      ville,
-      role,
-    };
-
-    // Champs spécifiques selon le rôle
-    if (role === 'VENDEUR') {
-      userData = {
-        ...userData,
-        nomEtablissement,
-        categorie,
-        registreCommerce,
-        identifiantFiscal,
-        rib,
-        horaireOuverture,
-      };
-    } else if (role === 'LIVREUR') {
-      userData = {
-        ...userData,
-        depotGarantie,
-        disponible,
-      };
+    const payload = { nom, prenom, email, login, motDePasse, telephone, adresse, role };
+    if (role === "LIVREUR") {
+      Object.assign(payload, { depotGarantie, disponible, matriculeVehicule,estValideParAdmin });
     }
 
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8082/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData),
+      const url =
+        role === "CLIENT"
+          ? "http://localhost:8082/api/clients"
+          : role === "VENDEUR"
+          ? "http://localhost:8082/api/vendeurs"
+          : "http://localhost:8082/api/livreurs";
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
-      if (response.ok) {
-        Alert.alert('Succès', 'Inscription réussie !');
-        router.push('/login');
+      if (response.status === 201) {
+        const data = await response.json();
+        if (role === "LIVREUR") {
+          setLivreurId(data.id);
+          await Promise.all([
+            photoProfil && uploadFile(photoProfil, data.id, "LivreurFichier-photo"),
+            pieceIdentite && uploadFile(pieceIdentite, data.id, "LivreurFichier-cin"),
+            assuranceVehicule && uploadFile(assuranceVehicule, data.id, "LivreurFichier-assurance"),
+            preuveDepotGarantie && uploadFile(preuveDepotGarantie, data.id, "LivreurFichier-preuveDepot"),
+          ]);
+        }
+        setAlertTitle("Succès");
+        setAlertMessage("Inscription réussie !");
       } else {
-        const error = await response.text();
-        Alert.alert('Erreur', error);
+        const text = await response.text();
+        setAlertTitle("Erreur");
+        setAlertMessage(text || "Échec d'inscription.");
       }
-    } catch (error) {
-      console.error('Erreur réseau:', error);
-      Alert.alert('Erreur', 'Problème de connexion au serveur.');
+    } catch (err) {
+      setAlertTitle("Erreur serveur");
+      setAlertMessage("Impossible de contacter le serveur.");
     } finally {
       setLoading(false);
+      setShowAlert(true);
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <Text style={styles.backButtonText}>← Retour</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.title}>Créer un compte</Text>
-
-      {/* Rôle */}
-      <Text style={styles.label}>Rôle</Text>
-      <TouchableOpacity
-        style={styles.dropdownToggle}
-        onPress={() => {
-          setCurrentDropdown('role');
-          setModalVisible(true);
-        }}
+    <ImageBackground
+      source={{
+        uri: "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&q=80&w=2070",
+      }}
+      style={styles.bg}
+    >
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
       >
-        <Text style={styles.dropdownToggleText}>{role || 'Choisir un rôle'}</Text>
-      </TouchableOpacity>
+        <ScrollView
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.card}>
+            <Text style={styles.title}>Créer un compte</Text>
 
-      {/* Champs communs */}
-      <TextInput style={styles.input} placeholder="Nom" onChangeText={setNom} />
-      <TextInput style={styles.input} placeholder="Prénom" onChangeText={setPrenom} />
-      <TextInput style={styles.input} placeholder="Email" onChangeText={setEmail} keyboardType="email-address" />
-      <TextInput style={styles.input} placeholder="Login" onChangeText={setLogin} />
-      <TextInput style={styles.input} placeholder="Mot de passe" onChangeText={setMotDePasse} secureTextEntry />
-      <TextInput style={styles.input} placeholder="Téléphone" onChangeText={setTelephone} keyboardType="phone-pad" />
-      <TextInput style={styles.input} placeholder="Adresse" onChangeText={setAdresse} />
+            {/* Sélection rôle */}
+            <Text style={styles.label}>Rôle</Text>
+            <TouchableOpacity
+              style={styles.dropdown}
+              onPress={() => {
+                setCurrentDropdown("role");
+                setModalVisible(true);
+              }}
+            >
+              <Text style={styles.dropdownText}>{role || "Choisir un rôle"}</Text>
+            </TouchableOpacity>
 
-      {/* Ville dropdown */}
-      <Text style={styles.label}>Ville</Text>
-      <TouchableOpacity
-        style={styles.dropdownToggle}
-        onPress={() => { setCurrentDropdown('ville'); setModalVisible(true); }}
-      >
-        <Text style={styles.dropdownToggleText}>{ville || 'Choisir une ville'}</Text>
-      </TouchableOpacity>
+            {/* Champs communs */}
+            <TextInput style={styles.input} placeholder="Nom" placeholderTextColor="#cbd5e1" value={nom} onChangeText={setNom} />
+            <TextInput style={styles.input} placeholder="Prénom" placeholderTextColor="#cbd5e1" value={prenom} onChangeText={setPrenom} />
+            <TextInput style={styles.input} placeholder="Email" placeholderTextColor="#cbd5e1" value={email} onChangeText={setEmail} />
+            <TextInput style={styles.input} placeholder="Login" placeholderTextColor="#cbd5e1" value={login} onChangeText={setLogin} />
+            <TextInput style={styles.input} placeholder="Mot de passe" placeholderTextColor="#cbd5e1" secureTextEntry value={motDePasse} onChangeText={setMotDePasse} />
+            <TextInput style={styles.input} placeholder="Téléphone" placeholderTextColor="#cbd5e1" value={telephone} onChangeText={setTelephone} />
+            <TextInput style={styles.input} placeholder="Adresse" placeholderTextColor="#cbd5e1" value={adresse} onChangeText={setAdresse} />
 
-      {/* Champs Vendeur */}
-      {role === 'VENDEUR' && (
-        <>
-          <TextInput style={styles.input} placeholder="Nom de l'établissement" onChangeText={setNomEtablissement} />
-          <TextInput style={styles.input} placeholder="Catégorie" onChangeText={setCategorie} />
-          <TextInput style={styles.input} placeholder="Registre de commerce" onChangeText={setRegistreCommerce} />
-          <TextInput style={styles.input} placeholder="Identifiant fiscal" onChangeText={setIdentifiantFiscal} />
-          <TextInput style={styles.input} placeholder="RIB (optionnel)" onChangeText={setRib} />
-
-          <Text style={styles.label}>Jour d’ouverture</Text>
-          <TouchableOpacity style={styles.dropdownToggle} onPress={() => { setCurrentDropdown('jour'); setModalVisible(true); }}>
-            <Text style={styles.dropdownToggleText}>{horaireOuverture.jour || 'Choisir un jour'}</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.label}>Heure d’ouverture</Text>
-          <TouchableOpacity style={styles.dropdownToggle} onPress={() => { setCurrentDropdown('heureOuverture'); setModalVisible(true); }}>
-            <Text style={styles.dropdownToggleText}>{horaireOuverture.heureOuverture || 'Choisir une heure'}</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.label}>Heure de fermeture</Text>
-          <TouchableOpacity style={styles.dropdownToggle} onPress={() => { setCurrentDropdown('heureFermeture'); setModalVisible(true); }}>
-            <Text style={styles.dropdownToggleText}>{horaireOuverture.heureFermeture || 'Choisir une heure'}</Text>
-          </TouchableOpacity>
-        </>
-      )}
-
-      {/* Champs Livreur */}
-      {role === 'LIVREUR' && (
-        <>
-          <TextInput
-            style={styles.input}
-            placeholder="Dépôt de garantie"
-            keyboardType="numeric"
-            onChangeText={setDepotGarantie}
-          />
-          <Text>Disponible ?</Text>
-          <TouchableOpacity onPress={() => setDisponible(!disponible)} style={styles.dropdownToggle}>
-            <Text style={styles.dropdownToggleText}>{disponible ? 'Oui' : 'Non'}</Text>
-          </TouchableOpacity>
-        </>
-      )}
-
-      {/* Submit */}
-      <View style={styles.buttonContainer}>
-        {loading ? (
-          <ActivityIndicator size="large" color="#1E40AF" />
-        ) : (
-          <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-            <Text style={styles.submitButtonText}>Soumettre</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Dropdown Modal */}
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
-          <View style={styles.modalContainer}>
-            <TouchableWithoutFeedback>
-              <View style={styles.modalContent}>
-                <FlatList
-                  data={
-                    currentDropdown === 'ville' ? villes :
-                    currentDropdown === 'jour' ? jours :
-                    currentDropdown === 'role' ? roles.map(r => r.value) :
-                    heures
-                  }
-                  renderItem={({ item }) => (
-                    <TouchableOpacity style={styles.modalItem} onPress={() => {
-                      if(currentDropdown === 'role') setRole(item);
-                      else handleDropdownSelect(item);
-                    }}>
-                      <Text style={styles.modalItemText}>{item}</Text>
-                    </TouchableOpacity>
-                  )}
-                  keyExtractor={(item, index) => index.toString()}
+            {/* LIVREUR */}
+            {role === "LIVREUR" && (
+              <>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Dépôt de garantie"
+                  placeholderTextColor="#cbd5e1"
+                  value={depotGarantie}
+                  onChangeText={setDepotGarantie}
+                  keyboardType="numeric"
                 />
-              </View>
-            </TouchableWithoutFeedback>
+                <TouchableOpacity
+                  style={styles.dropdown}
+                  onPress={() => setDisponible(!disponible)}
+                >
+                  <Text style={styles.dropdownText}>
+                    {disponible ? "Disponible : Oui" : "Disponible : Non"}
+                  </Text>
+                </TouchableOpacity>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Matricule du véhicule"
+                  placeholderTextColor="#cbd5e1"
+                  value={matriculeVehicule}
+                  onChangeText={setMatriculeVehicule}
+                />
+
+                {/* Pièces jointes */}
+                <Text style={styles.label}>Pièces jointes</Text>
+                <TouchableOpacity style={styles.dropdown} onPress={handlePhotoProfil}>
+                  <Text style={styles.dropdownText}>
+                    {photoProfil ? photoProfil.name : "Photo de profil"}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.dropdown}
+                  onPress={() => handlePieceJointe(setPieceIdentite, "LivreurFichier-cin")}
+                >
+                  <Text style={styles.dropdownText}>
+                    {pieceIdentite ? pieceIdentite.name : "Pièce d’identité"}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.dropdown}
+                  onPress={() => handlePieceJointe(setAssuranceVehicule, "LivreurFichier-assurance")}
+                >
+                  <Text style={styles.dropdownText}>
+                    {assuranceVehicule ? assuranceVehicule.name : "Assurance et carte grise"}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.dropdown}
+                  onPress={() => handlePieceJointe(setPreuveDepotGarantie, "LivreurFichier-preuveDepot")}
+                >
+                  <Text style={styles.dropdownText}>
+                    {preuveDepotGarantie ? preuveDepotGarantie.name : "💰 Preuve du dépôt de garantie"}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            <TouchableOpacity style={styles.submit} onPress={handleSubmit} disabled={loading}>
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.submitText}>Soumettre</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* Sélecteur de rôle */}
+      <Modal visible={modalVisible} transparent animationType="fade">
+        <TouchableWithoutFeedback onPress={() => setModalVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalBox}>
+              <FlatList
+                data={roles}
+                keyExtractor={(item) => item.value}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.modalItem}
+                    onPress={() => {
+                      setRole(item.value);
+                      setModalVisible(false);
+                    }}
+                  >
+                    <Text style={styles.modalItemText}>{item.label}</Text>
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
           </View>
         </TouchableWithoutFeedback>
       </Modal>
-    </ScrollView>
+
+      {/* Alerte */}
+      <AwesomeAlert
+        show={showAlert}
+        title={alertTitle}
+        message={alertMessage}
+        showConfirmButton
+        confirmText="OK"
+        confirmButtonColor="#2563eb"
+        onConfirmPressed={() => {
+          setShowAlert(false);
+          if (alertTitle === "Succès") router.push("/");
+        }}
+      />
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20, backgroundColor: '#f0f4f8', flexGrow: 1 },
-  backButton: { marginBottom: 10 },
-  backButtonText: { color: '#1E40AF', fontSize: 16 },
-  title: { fontSize: 28, fontWeight: 'bold', textAlign: 'center', marginBottom: 25, color: '#1E3A8A' },
+  bg: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: "center", // 💡 Centre verticalement
+    alignItems: "center", // 💡 Centre horizontalement
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+  },
+  card: {
+    width: "100%",
+    maxWidth: 400,
+    backgroundColor: "rgba(30,41,59,0.9)",
+    padding: 25,
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.4,
+    shadowOffset: { width: 0, height: 5 },
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#f8fafc",
+    textAlign: "center",
+    marginBottom: 25,
+  },
+  label: { color: "#cbd5e1", fontSize: 14, marginBottom: 5 },
   input: {
-    borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12,
-    marginBottom: 15, padding: 14, fontSize: 16, backgroundColor: '#ffffff', color: '#1e293b',
-    shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: 2 }, shadowRadius: 5, elevation: 2,
+    borderWidth: 1,
+    borderColor: "#475569",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    color: "#f1f5f9",
+    backgroundColor: "rgba(51,65,85,0.5)",
   },
-  label: { fontSize: 15, marginBottom: 5, color: '#334155', fontWeight: '500' },
-  dropdownToggle: {
-    padding: 14, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#cbd5e1',
-    borderRadius: 12, marginBottom: 15, shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 5, elevation: 2,
+  dropdown: {
+    borderWidth: 1,
+    borderColor: "#475569",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    backgroundColor: "rgba(51,65,85,0.5)",
   },
-  dropdownToggleText: { fontSize: 16, color: '#1e293b' },
-  buttonContainer: { marginTop: 20, borderRadius: 12, overflow: 'hidden' },
-  submitButton: {
-    backgroundColor: '#1E40AF', paddingVertical: 16, borderRadius: 12,
-    alignItems: 'center', shadowColor: '#1e40af', shadowOpacity: 0.25, shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 6, elevation: 4, marginBottom: 10,
+  dropdownText: { color: "#f1f5f9" },
+  submit: {
+    backgroundColor: "#2563eb",
+    padding: 15,
+    borderRadius: 10,
+    alignItems: "center",
+    marginTop: 10,
   },
-  submitButtonText: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  modalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(30, 41, 59, 0.7)' },
-  modalContent: { backgroundColor: '#f8fafc', borderRadius: 12, padding: 20, width: '80%', maxHeight: '50%' },
-  modalItem: { padding: 14, borderBottomWidth: 1, borderColor: '#e2e8f0' },
-  modalItemText: { fontSize: 16, color: '#1e293b' },
+  submitText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBox: {
+    backgroundColor: "#1e293b",
+    borderRadius: 10,
+    width: "80%",
+    paddingVertical: 10,
+  },
+  modalItem: { padding: 12, borderBottomWidth: 1, borderBottomColor: "#334155" },
+  modalItemText: { color: "#f1f5f9", fontSize: 16 },
 });
