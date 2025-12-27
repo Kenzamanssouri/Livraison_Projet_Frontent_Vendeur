@@ -14,6 +14,7 @@ import {
 import { useRouter } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import AwesomeAlert from "react-native-awesome-alerts";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -30,6 +31,7 @@ export default function LoginScreen() {
   const [alertTitle, setAlertTitle] = useState("");
   const [alertMessage, setAlertMessage] = useState("");
 
+  // 🔥 LOGIN + REDIRECTION SELON ROLE
   const handleLogin = async () => {
     if (!login || !motDePasse) {
       setAlertTitle("Champs requis");
@@ -39,6 +41,7 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
+
     try {
       const response = await fetch("http://localhost:8082/api/auth/login", {
         method: "POST",
@@ -46,24 +49,48 @@ export default function LoginScreen() {
         body: JSON.stringify({ login, motDePasse }),
       });
 
-      if (response.ok) {
-        setAlertTitle("Succès");
-        setAlertMessage("Connexion réussie !");
-      } else if(response.status==401){
-        debugger
+      if (!response.ok) {
+        if (response.status === 401) {
           setAlertTitle("Erreur");
-        setAlertMessage("l'utilisateur n'est pas encore valider par l'admin.");
+          setAlertMessage(
+            "L'utilisateur n'est pas encore validé par l'admin."
+          );
+        } else {
+          setAlertTitle("Erreur");
+          setAlertMessage("Login ou mot de passe incorrect.");
+        }
+        setShowAlert(true);
+        return;
       }
-      else{
-        setAlertTitle("Erreur");
-        setAlertMessage("Login ou mot de passe incorrect.");
-      }
+
+      // Lire JSON
+      const data = await response.json(); // { token, role, id }
+
+      // Stocker
+      await AsyncStorage.setItem("token", data.token);
+      await AsyncStorage.setItem("role", data.role);
+      await AsyncStorage.setItem("userId", data.id.toString());
+
+      // Succès
+      setAlertTitle("Succès");
+      setAlertMessage("Connexion réussie !");
+      setShowAlert(true);
+
+      // 🔥 Redirection selon rôle
+      setTimeout(() => {
+        if (data.role === "VENDEUR") {
+router.replace("dashboard-vendeur");
+        } else {
+          router.replace("/dashboard");
+        }
+      }, 300);
+
     } catch (err) {
       setAlertTitle("Erreur serveur");
       setAlertMessage("Impossible de contacter le serveur.");
+      setShowAlert(true);
     } finally {
       setLoading(false);
-      setShowAlert(true);
     }
   };
 
@@ -120,7 +147,8 @@ export default function LoginScreen() {
               style={{ marginTop: 15 }}
             >
               <Text style={styles.linkText}>
-                Pas encore de compte ? <Text style={{ color: "#60a5fa" }}>Inscrivez-vous</Text>
+                Pas encore de compte ?{" "}
+                <Text style={{ color: "#60a5fa" }}>Inscrivez-vous</Text>
               </Text>
             </TouchableOpacity>
           </View>
@@ -134,10 +162,7 @@ export default function LoginScreen() {
         showConfirmButton
         confirmText="OK"
         confirmButtonColor="#2563eb"
-        onConfirmPressed={() => {
-          setShowAlert(false);
-          if (alertTitle === "Succès") router.push("/dashboard");
-        }}
+        onConfirmPressed={() => setShowAlert(false)} // ❗ Ne force plus de route ici
       />
     </ImageBackground>
   );

@@ -16,41 +16,39 @@ import DropDownPicker from "react-native-dropdown-picker";
 export default function WelcomeScreen() {
   const router = useRouter();
 
-  // Langues
   const [lang, setLang] = useState("fr");
   const [open, setOpen] = useState(false);
 
-const texts = {
-  fr: {
-    title: "Bienvenue sur l’application",
-    subtitle: "Connectez-vous pour gérer vos commandes et ventes",
-    create: "Créer un compte",
-    login: "Se connecter",
-    footer: "© 2025 — Tous droits réservés",
-  },
-  en: {
-    title: "Welcome to the App",
-    subtitle: "Login to manage your orders and sales",
-    create: "Create Account",
-    login: "Login",
-    footer: "© 2025 — All rights reserved",
-  },
-  es: {
-    title: "Bienvenido a la aplicación",
-    subtitle: "Inicie sesión para gestionar sus pedidos y ventas",
-    create: "Crear cuenta",
-    login: "Iniciar sesión",
-    footer: "© 2025 — Todos los derechos reservados",
-  },
-  ar: {
-    title: "مرحبًا بكم في التطبيق",
-    subtitle: "قم بتسجيل الدخول لإدارة طلباتك ومبيعاتك",
-    create: "إنشاء حساب",
-    login: "تسجيل الدخول",
-    footer: "© ٢٠٢٥ — جميع الحقوق محفوظة",
-  },
-};
-
+  const texts = {
+    fr: {
+      title: "Bienvenue sur l’application",
+      subtitle: "Connectez-vous pour gérer vos commandes et ventes",
+      create: "Créer un compte",
+      login: "Se connecter",
+      footer: "© 2025 — Tous droits réservés",
+    },
+    en: {
+      title: "Welcome to the App",
+      subtitle: "Login to manage your orders and sales",
+      create: "Create Account",
+      login: "Login",
+      footer: "© 2025 — All rights reserved",
+    },
+    es: {
+      title: "Bienvenido a la aplicación",
+      subtitle: "Inicie sesión para gestionar sus pedidos y ventas",
+      create: "Crear cuenta",
+      login: "Iniciar sesión",
+      footer: "© 2025 — Todos los derechos reservados",
+    },
+    ar: {
+      title: "مرحبًا بكم في التطبيق",
+      subtitle: "قم بتسجيل الدخول لإدارة طلباتك ومبيعاتك",
+      create: "إنشاء حساب",
+      login: "تسجيل الدخول",
+      footer: "© ٢٠٢٥ — جميع الحقوق محفوظة",
+    },
+  };
 
   const languages = [
     { label: "Français 🇫🇷", value: "fr" },
@@ -59,7 +57,6 @@ const texts = {
     { label: "العربية 🇸🇦", value: "ar" },
   ];
 
-  // Charger la langue sauvegardée
   useEffect(() => {
     (async () => {
       const savedLang = await AsyncStorage.getItem("lang");
@@ -67,7 +64,6 @@ const texts = {
     })();
   }, []);
 
-  // Changement de langue + RTL pour arabe
   const changeLanguage = async (newLang) => {
     setLang(newLang);
     await AsyncStorage.setItem("lang", newLang);
@@ -76,18 +72,21 @@ const texts = {
 
   return (
     <>
-      {/* Supprime le header Expo Router */}
       <Stack.Screen options={{ headerShown: false }} />
 
       <ImageBackground
         source={{
-          uri: "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&q=80&w=2070",
+          uri: "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=2070&q=80",
         }}
         style={styles.background}
         resizeMode="cover"
       >
+        {/* 🔥 Overlay sombre pour un design premium */}
+        <View style={styles.overlay} />
+
         <KeyboardAvoidingView behavior="padding" style={styles.container}>
-          {/* Sélecteur de langue flottant */}
+          
+          {/* Sélecteur langue */}
           <View style={styles.langDropdownWrapper}>
             <DropDownPicker
               open={open}
@@ -102,6 +101,7 @@ const texts = {
             />
           </View>
 
+          {/* Carte */}
           <View style={[styles.card, lang === "ar" && { direction: "rtl" }]}>
             <Image
               source={{
@@ -109,6 +109,7 @@ const texts = {
               }}
               style={styles.logo}
             />
+
             <Text style={styles.title}>{texts[lang].title}</Text>
             <Text style={styles.subtitle}>{texts[lang].subtitle}</Text>
 
@@ -135,27 +136,47 @@ const texts = {
 }
 
 const styles = StyleSheet.create({
-  background: { flex: 1, justifyContent: "center" },
+  background: {
+    flex: 1,
+    justifyContent: "center",
+    backgroundColor: "#000",
+  },
+
+  // Overlay sombre (effet premium)
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+
   container: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 20,
   },
+
   card: {
     width: "100%",
     maxWidth: 380,
-    backgroundColor: "rgba(30, 41, 59, 0.85)",
+    backgroundColor: "rgba(40,60,100,0.85)", // 💙 BLEU FONCÉ ELEGANT
     borderRadius: 20,
     padding: 30,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)", // petit effet chic
     shadowColor: "#000",
-    shadowOpacity: 0.4,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 10,
+    shadowOpacity: 0.5,
+    shadowOffset: { width: 0, height: 5 },
+    shadowRadius: 12,
+    elevation: 12,
   },
-  logo: { width: 80, height: 80, marginBottom: 15 },
+
+  logo: {
+    width: 80,
+    height: 80,
+    marginBottom: 15,
+  },
+
   title: {
     fontSize: 24,
     fontWeight: "700",
@@ -163,29 +184,38 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 10,
   },
+
   subtitle: {
     fontSize: 14,
-    color: "#94a3b8",
+    color: "#cbd5e1",
     textAlign: "center",
     marginBottom: 30,
   },
+
   button: {
     width: "100%",
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: "center",
     marginVertical: 8,
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 5,
   },
-  buttonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+
+  buttonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 16,
+  },
+
   footer: {
     marginTop: 25,
     fontSize: 12,
-    color: "#94a3b8",
+    color: "#cbd5e1",
     textAlign: "center",
   },
+
   langDropdownWrapper: {
     position: "absolute",
     top: 40,
@@ -193,7 +223,19 @@ const styles = StyleSheet.create({
     width: 150,
     zIndex: 1000,
   },
-  dropdown: { backgroundColor: "rgba(255,255,255,0.1)" },
-  dropdownText: { color: "#f1f5f9" },
-  dropdownContainer: { backgroundColor: "rgba(30,41,59,0.9)" },
+
+  dropdown: {
+    backgroundColor: "rgba(40,60,100,0.9)",
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+
+  dropdownText: {
+    color: "#fff",
+    fontSize: 14,
+  },
+
+  dropdownContainer: {
+    backgroundColor: "rgba(30,45,70,0.95)",
+    borderColor: "rgba(255,255,255,0.15)",
+  },
 });

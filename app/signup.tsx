@@ -50,12 +50,13 @@ export default function SignupScreen() {
   const [motDePasse, setMotDePasse] = useState("");
   const [telephone, setTelephone] = useState("");
   const [adresse, setAdresse] = useState("");
+  const [showPassword, setShowPassword] = useState(false);     // 👁️ Nouveau
 
   // --- Champs Livreur ---
   const [depotGarantie, setDepotGarantie] = useState("");
   const [disponible, setDisponible] = useState(false);
   const [matriculeVehicule, setMatriculeVehicule] = useState("");
-  const [estValideParAdmin, setestValideParAdmin] = useState(false);
+  const [estValideParAdmin, setestValideParAdmin] = useState(null);
   const [photoProfil, setPhotoProfil] = useState(null);
   const [pieceIdentite, setPieceIdentite] = useState(null);
   const [assuranceVehicule, setAssuranceVehicule] = useState(null);
@@ -63,6 +64,7 @@ export default function SignupScreen() {
   // --- Pièces jointes Vendeur ---
 const [registreCommerceFile, setRegistreCommerceFile] = useState(null);
 const [cnssFile, setCnssFile] = useState(null);
+const [logoFile, setLogoFile] = useState(null);
 
   const [livreurId, setLivreurId] = useState(null);
 
@@ -172,12 +174,14 @@ const [cnssFile, setCnssFile] = useState(null);
             preuveDepotGarantie && uploadFile(preuveDepotGarantie, data.id, "LivreurFichier-preuveDepot"),
           ]);
         }
-        if (role === "VENDEUR") {
+      if (role === "VENDEUR") {
   await Promise.all([
     registreCommerceFile && uploadFile(registreCommerceFile, data.id, "VendeurFichier-rc"),
     cnssFile && uploadFile(cnssFile, data.id, "VendeurFichier-cnss"),
+    logoFile && uploadFile(logoFile, data.id, "VendeurFichier-logo"),
   ]);
 }
+
 
         setAlertTitle("Succès");
         setAlertMessage("Inscription réussie !");
@@ -230,7 +234,24 @@ const [cnssFile, setCnssFile] = useState(null);
             <TextInput style={styles.input} placeholder="Prénom" placeholderTextColor="#cbd5e1" value={prenom} onChangeText={setPrenom} />
             <TextInput style={styles.input} placeholder="Email" placeholderTextColor="#cbd5e1" value={email} onChangeText={setEmail} />
             <TextInput style={styles.input} placeholder="Login" placeholderTextColor="#cbd5e1" value={login} onChangeText={setLogin} />
-            <TextInput style={styles.input} placeholder="Mot de passe" placeholderTextColor="#cbd5e1" secureTextEntry value={motDePasse} onChangeText={setMotDePasse} />
+          {/*  <TextInput style={styles.input} placeholder="Mot de passe" placeholderTextColor="#cbd5e1" secureTextEntry value={motDePasse} onChangeText={setMotDePasse} />*/}
+          <View style={styles.passwordContainer}>
+  <TextInput
+    style={[styles.input, { flex: 1, marginBottom: 0 }]}
+    placeholder="Mot de passe"
+    placeholderTextColor="#94a3b8"
+    secureTextEntry={!showPassword}
+    value={motDePasse}
+    onChangeText={setMotDePasse}
+  />
+
+  <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+    <Text style={styles.showPwdText}>
+      {showPassword ? "🙈" : "👁️"}
+    </Text>
+  </TouchableOpacity>
+</View>
+
             <TextInput style={styles.input} placeholder="Téléphone" placeholderTextColor="#cbd5e1" value={telephone} onChangeText={setTelephone} />
             <TextInput style={styles.input} placeholder="Adresse" placeholderTextColor="#cbd5e1" value={adresse} onChangeText={setAdresse} />
 
@@ -403,6 +424,15 @@ const [cnssFile, setCnssFile] = useState(null);
         {cnssFile ? cnssFile.name : "📎 Attestation CNSS"}
       </Text>
     </TouchableOpacity>
+    <TouchableOpacity
+  style={styles.dropdown}
+  onPress={() => handlePieceJointe(setLogoFile, "VendeurFichier-logo")}
+>
+  <Text style={styles.dropdownText}>
+    {logoFile ? logoFile.name : "🖼️ Logo / Image de l'établissement"}
+  </Text>
+</TouchableOpacity>
+
     {/* --- Fin Ajout --- */}
 
     <Text style={styles.label}>🕒 Horaires d'ouverture</Text>
@@ -638,4 +668,18 @@ const styles = StyleSheet.create({
   modalBox: { backgroundColor: "#1e293b", width: "80%", borderRadius: 15, paddingVertical: 15 },
   modalItem: { paddingVertical: 12, paddingHorizontal: 15 },
   modalItemText: { color: "#f1f5f9", fontSize: 16 },
+    showPwdText: {
+    fontSize: 22,
+    color: "#f1f5f9",
+    paddingHorizontal: 6,
+  },
+  passwordContainer: {
+  flexDirection: "row",
+  alignItems: "center",
+  backgroundColor: "#1e293b",
+  borderRadius: 10,
+  paddingHorizontal: 10,
+  marginBottom: 12,
+},
+
 });
