@@ -49,19 +49,15 @@ export default function LoginScreen() {
         body: JSON.stringify({ login, motDePasse }),
       });
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          setAlertTitle("Erreur");
-          setAlertMessage(
-            "L'utilisateur n'est pas encore validé par l'admin."
-          );
-        } else {
-          setAlertTitle("Erreur");
-          setAlertMessage("Login ou mot de passe incorrect.");
-        }
-        setShowAlert(true);
-        return;
-      }
+     if (!response.ok) {
+  const errorMessage = await response.text(); // 🔥 lire le message backend
+
+  setAlertTitle("Erreur");
+  setAlertMessage(errorMessage || "Erreur lors de la connexion");
+  setShowAlert(true);
+  return;
+}
+
 
       // Lire JSON
       const data = await response.json(); // { token, role, id }
@@ -77,12 +73,18 @@ export default function LoginScreen() {
       setShowAlert(true);
 
       // 🔥 Redirection selon rôle
-      setTimeout(() => {
+      setTimeout(() => {debugger
         if (data.role === "VENDEUR") {
 router.replace("dashboard-vendeur");
-        } else {
-          router.replace("/dashboard");
-        }
+        } else 
+  if (data.role === "CLIENT") {
+    router.replace("/client/home");
+  } else if (data.role === "LIVREUR") {debugger
+    router.replace("/livreur/home");
+  } else if (data.role === "ADMIN") {
+    router.replace("/admin/dashboard");
+  }
+
       }, 300);
 
     } catch (err) {

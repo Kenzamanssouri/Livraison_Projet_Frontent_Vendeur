@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
+import { Linking } from "react-native";
 
 const API = "http://localhost:8082";
 
@@ -35,11 +36,25 @@ const [showHorairesModal, setShowHorairesModal] = useState(false);
 const [currentJour, setCurrentJour] = useState("");
 const [heureOuverture, setHeureOuverture] = useState("");
 const [heureFermeture, setHeureFermeture] = useState("");
+const [showConfirm, setShowConfirm] = useState(false);
 
 const jours = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"];
+type Categorie = {
+  id: number;
+  nom: string;
+};
+
+const [categories, setCategories] = useState<Categorie[]>([]);
+const [newCategorie, setNewCategorie] = useState("");
+
+const [page, setPage] = useState(0);
+const [size] = useState(5);
+const [hasMore, setHasMore] = useState(true);
+const [loadingCats, setLoadingCats] = useState(false);
 
   useEffect(() => {
     loadAll();
+    loadCategories();
   }, []);
 
   const loadAll = async () => {
@@ -68,9 +83,26 @@ fetch(`${API}/api/vendeurs/${vendeurId}`)
     //   .then(res => res.json())
     //   .then(setVendeurCategories);
 
-    fetch(`${API}/api/uploadPj1/by-Id-type/${vendeurId}/vendeur`)
-      .then(res => res.json())
-      .then(setPjs);
+fetch(`${API}/api/uploadPj1/by-Id-type/${vendeurId}/VendeurFichier`)
+  .then(res => {
+    if (!res.ok) {
+      throw new Error(`Erreur HTTP ${res.status}`);
+    }
+    // Attention, JSON seulement si le body existe
+    return res.text(); // on récupère d’abord le texte brut
+  })
+  .then(text => {
+    if (text) {
+      setPjs(JSON.parse(text)); // parse JSON si non vide
+    } else {
+      setPjs([]); // réponse vide → tableau vide
+    }
+  })
+  .catch(err => {
+    console.error(err);
+    setPjs([]); // pour éviter crash
+  });
+
   };
 
   // ---------------- PROFIL ----------------
@@ -127,6 +159,46 @@ const updateVendeur = async () => {
   }
 };
 
+const downloadPj = async (id: number) => {
+  const url = `${API}/api/uploadPj1/download/id/${id}`;
+
+  try {
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      await Linking.openURL(url);
+    } else {
+      Alert.alert("Erreur", "Impossible d’ouvrir le document");
+    }
+  } catch (error) {
+    Alert.alert("Erreur", "Téléchargement échoué");
+  }
+};
+
+const loadCategories = async (pageToLoad = 0) => {
+  if (loadingCats || !hasMore) return;
+
+  setLoadingCats(true);
+
+  try {
+    const res = await fetch(
+      `${API}/api/categories/paged?page=${pageToLoad}&size=${size}`
+    );
+    const data = await res.json();
+
+    setCategories(prev =>
+      pageToLoad === 0
+        ? data.content
+        : [...prev, ...data.content]
+    );
+
+    setHasMore(!data.last);
+    setPage(data.number);
+  } catch (e) {
+    Alert.alert("Erreur", "Impossible de charger les catégories");
+  } finally {
+    setLoadingCats(false);
+  }
+};
 
 
   // ---------------- CATEGORIES ----------------
@@ -139,7 +211,7 @@ const updateVendeur = async () => {
 
   // ---------------- DESACTIVATION ----------------
   const deactivateAccount = async () => {
-    await fetch(`${API}/api/vendeurs/${vendeur.id}/deactivate`, {
+    await fetch(`${API}/api/vendeurs/${vendeur.id}/toggle`, {
       method: "PUT",
     });
 
@@ -147,20 +219,22 @@ const updateVendeur = async () => {
     router.replace("/login");
   };
 
-  const confirmDeactivate = () => {
-    Alert.alert(
-      "Confirmation",
-      "Voulez-vous vraiment désactiver votre compte ?",
-      [
-        { text: "Annuler", style: "cancel" },
-        {
-          text: "Désactiver",
-          style: "destructive",
-          onPress: deactivateAccount,
-        },
-      ]
-    );
-  };
+const confirmDeactivate = () => {
+  setShowConfirm(true);
+};
+
+const addCategorie = async () => {
+  if (!newCategorie.trim()) return;
+
+  await fetch(`${API}/api/categories`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nom: newCategorie }),
+  });
+
+  setNewCategorie("");
+  loadCategories(); // recharge vendeurCategories
+};
 
   // ---------------- UI ----------------
   return (
@@ -180,10 +254,19 @@ const updateVendeur = async () => {
       </TouchableOpacity>
 
       {/* CATEGORIES */}
-      <TouchableOpacity style={styles.card} onPress={() => setShowCategories(true)}>
-        <Text style={styles.cardTitle}>🗂 Catégories</Text>
-        <Text style={styles.cardDesc}>Activer / désactiver</Text>
-      </TouchableOpacity>
+ <TouchableOpacity
+  style={styles.card}
+  onPress={() => {
+    setShowCategories(true);
+    setCategories([]);
+    setPage(0);
+    setHasMore(true);
+    loadCategories(0);
+  }}
+>
+  <Text style={styles.cardTitle}>🗂 Catégories</Text>
+</TouchableOpacity>
+
 
       {/* DESACTIVATION */}
       <TouchableOpacity
@@ -437,31 +520,124 @@ setShowHorairesModal(false);
 
 
       {/* CATEGORIES */}
-      <Modal visible={showCategories} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Catégories</Text>
+  <Modal visible={showCategories} transparent animationType="slide">
+  <View style={styles.modalOverlay}>
+    <View style={styles.modal}>
+      <Text style={styles.modalTitle}>Catégories</Text>
 
-            <FlatList
-              data={vendeurCategories}
-              keyExtractor={(i) => i.id.toString()}
-              renderItem={({ item }) => (
-                <View style={styles.row}>
-                  <Text>{item.categorie.nom}</Text>
-                  <Switch
-                    value={item.actif}
-                    onValueChange={() => toggleCategorie(item.id)}
-                  />
-                </View>
-              )}
-            />
-
-            <TouchableOpacity onPress={() => setShowCategories(false)}>
-              <Text style={styles.cancel}>Fermer</Text>
-            </TouchableOpacity>
+      <FlatList
+        data={categories}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={({ item }) => (
+          <View style={styles.row}>
+            <Text>{item.nom}</Text>
           </View>
-        </View>
-      </Modal>
+        )}
+
+        refreshing={loadingCats}
+        onRefresh={() => {
+          setCategories([]);
+          setPage(0);
+          setHasMore(true);
+          loadCategories(0);
+        }}
+
+        ListFooterComponent={
+          loadingCats ? (
+            <Text style={{ textAlign: "center", color: "#64748b", marginVertical: 6 }}>
+              Chargement...
+            </Text>
+          ) : null
+        }
+
+        ListEmptyComponent={
+          !loadingCats ? (
+            <Text style={{ textAlign: "center", color: "#64748b", marginVertical: 10 }}>
+              Aucune catégorie
+            </Text>
+          ) : null
+        }
+      />
+
+      {/* PAGINATION */}
+      <View style={styles.paginationContainer}>
+        <TouchableOpacity
+          style={[
+            styles.pageBtn,
+            page === 0 && styles.pageBtnDisabled,
+          ]}
+          disabled={page === 0 || loadingCats}
+          onPress={() => {
+            const prev = page - 1;
+            setCategories([]);
+            setHasMore(true);
+            loadCategories(prev);
+          }}
+        >
+          <Text style={styles.pageBtnText}>⬅ Précédent</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.pageNumber}>
+          Page {page + 1}
+        </Text>
+
+        <TouchableOpacity
+          style={[
+            styles.pageBtn,
+            !hasMore && styles.pageBtnDisabled,
+          ]}
+          disabled={!hasMore || loadingCats}
+          onPress={() => {
+            const next = page + 1;
+            setCategories([]);
+            setHasMore(true);
+            loadCategories(next);
+          }}
+        >
+          <Text style={styles.pageBtnText}>Suivant ➡</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ADD CATEGORY */}
+      <TextInput
+        style={styles.input}
+        placeholder="Nouvelle catégorie"
+        value={newCategorie}
+        onChangeText={setNewCategorie}
+      />
+
+      <TouchableOpacity
+        style={styles.saveBtn}
+        onPress={async () => {
+          if (!newCategorie.trim()) return;
+
+          await fetch(`${API}/api/categories`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nom: newCategorie }),
+          });
+
+          setNewCategorie("");
+          setCategories([]);
+          setPage(0);
+          setHasMore(true);
+          loadCategories(0);
+        }}
+      >
+        <Text style={{ color: "white", fontWeight: "700" }}>
+          ➕ Ajouter
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={() => setShowCategories(false)}>
+        <Text style={styles.cancel}>Fermer</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+</Modal>
+
+
+
 
       {/* PJ */}
       <Modal visible={showPjs} transparent animationType="slide">
@@ -469,11 +645,17 @@ setShowHorairesModal(false);
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>Documents</Text>
 
-            {pjs.map((pj) => (
-              <TouchableOpacity key={pj.id}>
-                <Text>📄 {pj.nom || "Document"}</Text>
-              </TouchableOpacity>
-            ))}
+           {pjs.map((pj) => (
+  <TouchableOpacity
+    key={pj.id}
+    onPress={() => downloadPj(pj.id)}
+  >
+    <Text style={{ color: "#2563eb" }}>
+      📄 {pj.name || "Document"}
+    </Text>
+  </TouchableOpacity>
+))}
+
 
             <TouchableOpacity onPress={() => setShowPjs(false)}>
               <Text style={styles.cancel}>Fermer</Text>
@@ -481,6 +663,36 @@ setShowHorairesModal(false);
           </View>
         </View>
       </Modal>
+      <Modal visible={showConfirm} transparent animationType="fade">
+  <View style={styles.modalOverlay}>
+    <View style={styles.confirmBox}>
+      <Text style={styles.modalTitle}>Confirmation</Text>
+      <Text style={{ marginBottom: 16, textAlign: "center" }}>
+        Voulez-vous vraiment désactiver votre compte ?
+      </Text>
+
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        <TouchableOpacity
+          style={[styles.pageBtn, { backgroundColor: "#94a3b8" }]}
+          onPress={() => setShowConfirm(false)}
+        >
+          <Text style={styles.pageBtnText}>Annuler</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.pageBtn, { backgroundColor: "#dc2626" }]}
+          onPress={() => {
+            setShowConfirm(false);
+            deactivateAccount();
+          }}
+        >
+          <Text style={styles.pageBtnText}>Désactiver</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
+
     </View>
   );
 }
@@ -560,4 +772,41 @@ addHoraireBtn: {
     alignItems: "center",
     paddingVertical: 10,
   },
+  paginationContainer: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  marginTop: 10,
+  marginBottom: 5,
+},
+
+pageBtn: {
+  backgroundColor: "#2563eb",
+  paddingVertical: 8,
+  paddingHorizontal: 14,
+  borderRadius: 10,
+},
+
+pageBtnDisabled: {
+  backgroundColor: "#94a3b8",
+},
+
+pageBtnText: {
+  color: "white",
+  fontWeight: "700",
+  fontSize: 13,
+},
+
+pageNumber: {
+  color: "#334155",
+  fontWeight: "700",
+  fontSize: 14,
+},
+confirmBox: {
+  backgroundColor: "white",
+  padding: 20,
+  borderRadius: 16,
+  width: "85%",
+},
+
 });

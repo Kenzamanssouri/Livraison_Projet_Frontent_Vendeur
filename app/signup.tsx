@@ -57,6 +57,7 @@ export default function SignupScreen() {
   const [disponible, setDisponible] = useState(false);
   const [matriculeVehicule, setMatriculeVehicule] = useState("");
   const [estValideParAdmin, setestValideParAdmin] = useState(null);
+  const [bloque, setbloque] = useState(false);
   const [photoProfil, setPhotoProfil] = useState(null);
   const [pieceIdentite, setPieceIdentite] = useState(null);
   const [assuranceVehicule, setAssuranceVehicule] = useState(null);
@@ -145,7 +146,7 @@ const [logoFile, setLogoFile] = useState(null);
     if (role === "LIVREUR") {
       Object.assign(payload, { depotGarantie, disponible, matriculeVehicule, estValideParAdmin });
     } else if (role === "VENDEUR") {
-      Object.assign(payload, { nomEtablissement, categorie, registreCommerce, identifiantFiscal, rib, horairesOuverture ,estValideParAdmin});
+      Object.assign(payload, { nomEtablissement, categorie, registreCommerce, identifiantFiscal, rib, horairesOuverture ,estValideParAdmin,bloque});
     }
 
     setLoading(true);

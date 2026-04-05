@@ -273,73 +273,96 @@ export default function ProduitsScreen() {
   // -------------------------
   // ✅ Import Excel (depuis popup)
   // -------------------------
-  const importExcel = async () => {
-    try {
-      const file = await DocumentPicker.getDocumentAsync({
-        type: [
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        ],
-      });
+const importExcel = async () => {
+  try {
+    const file = await DocumentPicker.getDocumentAsync({
+      type: [
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      ],
+      copyToCacheDirectory: true,
+    });
 
-      if (file.canceled) return;
+    if (file.canceled) return;
 
-      const form = new FormData();
+    const asset = file.assets[0];
+    const form = new FormData();
+
+    // ✅ CAS BASE64 (data:)
+    if (asset.uri.startsWith("data:")) {
+      const mime =
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+      const base64 = asset.uri.split(",")[1];
+      const blob = base64ToBlob(base64, mime);
+
+      form.append("file", blob as any, asset.name);
+    }
+    // ✅ CAS NORMAL (file://)
+    else {
       form.append(
         "file",
         {
-          uri: file.assets[0].uri,
-          name: file.assets[0].name,
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          uri: asset.uri,
+          name: asset.name,
+          type:
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         } as any
       );
-
-      const res = await fetch(`${API_BASE_URL}/api/produits/import`, {
-        method: "POST",
-        body: form,
-      });
-
-      if (!res.ok) {
-        Alert.alert("Erreur", "Import Excel échoué");
-        return;
-      }
-
-      setShowImportModal(false);
-      await loadProduits();
-      Alert.alert("OK", "Import Excel terminé");
-    } catch (e) {
-      console.error("Erreur importExcel", e);
-      Alert.alert("Erreur", "Une erreur s'est produite lors de l'import");
     }
-  };
+      const vendeurId = await AsyncStorage.getItem("userId");
+
+    const res = await fetch(`${API_BASE_URL}/api/produits/import/${vendeurId}`, {
+      method: "POST",
+      body: form,
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error(err);
+      Alert.alert("Erreur", "Import Excel échoué");
+      return;
+    }
+
+    setShowImportModal(false);
+    await loadProduits();
+    Alert.alert("OK", "Import Excel terminé");
+  } catch (e) {
+    console.error("Erreur importExcel", e);
+    Alert.alert("Erreur", "Une erreur s'est produite lors de l'import");
+  }
+};
+
 
   // -------------------------
   // ✅ Télécharger modèle Excel
   // -------------------------
   // ⚠️ Backend requis: GET /api/produits/template -> retourne produits_template.xlsx
-  const downloadExcelTemplate = async () => {
-    try {
-      const url = `${API_BASE_URL}/api/produits/template`;
-      const fileUri = `${FileSystem.documentDirectory}produits_template.xlsx`;
+const downloadExcelTemplate = async () => {
+  try {
+    const url = `${API_BASE_URL}/api/download/download-template`;
 
-      const res = await FileSystem.downloadAsync(url, fileUri);
-
-      const canShare = await Sharing.isAvailableAsync();
-      if (!canShare) {
-        Alert.alert(
-          "Info",
-          Platform.OS === "android"
-            ? `Fichier téléchargé: ${res.uri}`
-            : "Partage non disponible sur cet appareil"
-        );
-        return;
-      }
-
-      await Sharing.shareAsync(res.uri);
-    } catch (e) {
-      console.error("Erreur downloadExcelTemplate", e);
-      Alert.alert("Erreur", "Impossible de télécharger le modèle Excel");
+    // 🌐 WEB → téléchargement navigateur
+    if (Platform.OS === "web") {
+      window.open(url, "_blank");
+      return;
     }
-  };
+
+    // 📱 MOBILE → téléchargement + partage
+    const fileUri = `${FileSystem.documentDirectory}produits_template.xlsx`;
+
+    const res = await FileSystem.downloadAsync(url, fileUri);
+
+    const canShare = await Sharing.isAvailableAsync();
+    if (canShare) {
+      await Sharing.shareAsync(res.uri);
+    } else {
+      Alert.alert("Téléchargé", `Fichier enregistré: ${res.uri}`);
+    }
+  } catch (e) {
+    console.error("Erreur downloadExcelTemplate", e);
+    Alert.alert("Erreur", "Impossible de télécharger le modèle Excel");
+  }
+};
 
   // -------------------------
   // 🔥 Toggle status
